@@ -209,50 +209,77 @@ Style: Default,${fontFamily},${fontSize},${primaryAssColor},${highlightAssColor}
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 `;
 
-  // Group words into lines/segments if needed (simple approach: one line per original caption segment)
-  // For true karaoke, we process word by word.
-  // Assuming 'captions' now contains word-level timing from AssemblyAI
-
   if (!captions || captions.length === 0) {
     return assContent; // Return header if no captions
   }
 
-  // Determine the overall start and end time for the dialogue line
-  const dialogueStart = formatTimeASS(captions[0].start);
-  // Use the end time of the *last* word for the dialogue line end time
-  const dialogueEnd = formatTimeASS(captions[captions.length - 1].end);
-
-  let dialogueText = '';
-  // Set the initial color for the line to the primary color
-  dialogueText += `{\c${primaryAssColor}}`; // \c is equivalent to \1c
-
-  captions.forEach((word, index) => {
-    // Calculate word duration in centiseconds for \k tag
-    const duration = Math.round((word.end - word.start) * 100);
-
-    // \k<duration> changes the *primary* color to the *secondary* color for 'duration' centiseconds
-    // So, we set PrimaryColour to the normal text color and SecondaryColour to the highlight color in the Style definition.
-    // The text starts as PrimaryColour. \k<dur> highlights it using SecondaryColour.
-    dialogueText += `{\k${duration}}${word.text}`;
-
-    if (index < captions.length - 1) {
-      dialogueText += ' '; // Add space between words
+  // Implement the same sliding window approach as in WordLevelCaptionOverlay component
+  const maxWordsPerLine = 5; // Match the component's default
+  
+  for (let i = 0; i < captions.length; i++) {
+    const currentWord = captions[i];
+    
+    // Calculate which words should be visible (max 5 words centered around the current word)
+    let startIndex = Math.max(0, i - Math.floor(maxWordsPerLine / 2));
+    
+    // Adjust startIndex if we're near the end of the captions
+    if (startIndex + maxWordsPerLine > captions.length) {
+      startIndex = Math.max(0, captions.length - maxWordsPerLine);
     }
-  });
-
-  // Add the dialogue line with karaoke tags
-  assContent += `Dialogue: 0,${dialogueStart},${dialogueEnd},Default,,0,0,0,,${dialogueText}\n`;
+    
+    // Get the visible words for this window
+    const visibleWords = captions.slice(startIndex, startIndex + maxWordsPerLine);
+    
+    if (visibleWords.length === 0) continue;
+    
+    // Only create a dialogue line if the current word is in this window
+    if (!visibleWords.includes(currentWord)) continue;
+    
+    // Determine the start and end time for this dialogue line
+    // Use the current word's timing
+    const dialogueStart = formatTimeASS(currentWord.start);
+    const dialogueEnd = formatTimeASS(currentWord.end);
+    
+    // Build the dialogue text with the visible words
+    let dialogueText = '';
+    
+    visibleWords.forEach((word) => {
+      // Determine if this is the current active word
+      const isActive = word === currentWord;
+      
+      // Apply appropriate color based on whether the word is active
+      if (isActive) {
+        dialogueText += `{\c${highlightAssColor}\b1}${word.text}{\c${primaryAssColor}\b0}`;
+      } else {
+        dialogueText += word.text;
+      }
+      
+      dialogueText += ' '; // Add space between words
+    });
+    
+    // Add the dialogue line
+    assContent += `Dialogue: 0,${dialogueStart},${dialogueEnd},Default,,0,0,0,,${dialogueText.trim()}\n`;
+  }
 
   return assContent;
 }
 
 // Endpoint to receive style preferences and trigger final video generation
 app.post('/generate-video', async (req, res) => {
-  const { filePath, captions, style } = req.body;
+  const { filePath, captions, style, quality } = req.body;
 
   if (!filePath || !captions || !style) {
     return res.status(400).json({ message: 'Missing required data: filePath, captions, or style.' });
   }
+  
+  // Default quality settings if not provided
+  const videoQuality = quality || {
+    resolution: '720p',
+    frameRate: '30',
+    videoBitrate: '2000',
+    audioBitrate: '128',
+    preset: 'medium'
+  };
 
   if (!fs.existsSync(filePath)) {
     console.error('Input video file not found:', filePath);
@@ -283,11 +310,44 @@ app.post('/generate-video', async (req, res) => {
     // 2. Use FFmpeg to burn subtitles onto the video
     console.log(`Burning captions into video: ${finalVideoPath}`);
     await new Promise((resolve, reject) => {
-      ffmpeg(filePath)
-        // Use the subtitles filter with the generated ASS file
-        // Ensure FFmpeg build has libass enabled
-        // Correctly format the path for the subtitles filter using filename= syntax
-        .videoFilters(`subtitles=filename='${tempAssPath}'`)
+      const command = ffmpeg(filePath);
+      
+      // Prepare video filters
+      let videoFilters = [`subtitles=filename='${tempAssPath}'`];
+      
+      // Add resolution scaling if not original
+      if (videoQuality.resolution && videoQuality.resolution !== 'original') {
+        const resolution = videoQuality.resolution === '1080p' ? '1920:1080' :
+                           videoQuality.resolution === '720p' ? '1280:720' :
+                           videoQuality.resolution === '480p' ? '854:480' : null;
+        
+        if (resolution) {
+          videoFilters.push(`scale=${resolution}:force_original_aspect_ratio=decrease`);
+        }
+      }
+      
+      // Apply all video filters
+      command.videoFilters(videoFilters);
+      
+      // Set quality options
+      if (videoQuality.frameRate && videoQuality.frameRate !== 'original') {
+        command.fps(parseInt(videoQuality.frameRate));
+      }
+      
+      if (videoQuality.videoBitrate) {
+        command.videoBitrate(parseInt(videoQuality.videoBitrate) + 'k');
+      }
+      
+      if (videoQuality.audioBitrate) {
+        command.audioBitrate(parseInt(videoQuality.audioBitrate) + 'k');
+      }
+      
+      // Set encoding preset
+      command.outputOptions([
+        `-preset ${videoQuality.preset || 'medium'}`
+      ]);
+      
+      command
         .on('error', (err) => {
           console.error('Error during FFmpeg processing:', err);
           reject(new Error(`FFmpeg error: ${err.message}`));

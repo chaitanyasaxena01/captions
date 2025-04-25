@@ -1,12 +1,70 @@
-# React + Vite
+# Professional Video Captioner
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A modern web application for adding professional captions to videos with advanced styling and editing capabilities.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Modern UI/UX**: Clean, responsive interface built with styled-components
+- **Video Upload**: Easy video uploading with progress feedback
+- **Automatic Caption Generation**: Uses AssemblyAI to generate accurate captions
+- **Real-time Caption Preview**: See captions overlaid on your video during playback
+- **Caption Editing**: Edit, delete, or adjust auto-generated captions
+- **Advanced Styling Options**: Customize font, size, color, weight, shadows, and background
+- **Karaoke-style Highlighting**: Words are highlighted as they're spoken
+- **Final Video Generation**: Create downloadable videos with burned-in captions
+- **User Notifications**: Toast notifications for important events
 
-## Expanding the ESLint configuration
+## Getting Started
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Prerequisites
+
+- Node.js (v14 or higher)
+- FFmpeg installed on your system
+- AssemblyAI API key
+
+### Installation
+
+1. Clone the repository
+2. Install frontend dependencies:
+   ```
+   cd captions
+   npm install
+   ```
+3. Install backend dependencies:
+   ```
+   cd backend
+   npm install
+   ```
+4. Create a `.env` file in the backend directory with your AssemblyAI API key:
+   ```
+   ASSEMBLYAI_API_KEY=your_api_key_here
+   ```
+
+### Running the Application
+
+1. Start the backend server:
+   ```
+   cd backend
+   node server.js
+   ```
+2. Start the frontend development server:
+   ```
+   cd captions
+   npm run dev
+   ```
+3. Open your browser and navigate to `http://localhost:5173`
+
+## Usage
+
+1. **Upload a Video**: Click "Select Video File" and choose a video from your computer
+2. **Customize Caption Style**: Adjust font, size, colors, and other styling options
+3. **Edit Captions**: Modify the auto-generated captions as needed
+4. **Preview**: Watch your video with captions in real-time
+5. **Generate Final Video**: Click "Generate Final Video" to create the final version
+6. **Download**: Once processing is complete, download your captioned video
+
+## Technologies Used
+
+- **Frontend**: React, styled-components, react-toastify, react-icons
+- **Backend**: Node.js, Express, fluent-ffmpeg, AssemblyAI API
+- **Video Processing**: FFmpeg for caption burning and video manipulation
