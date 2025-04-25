@@ -1,5 +1,5 @@
 {
-    "name": "worker-name",
+    "name": "captions",
     "compatibility_date": "2025-04-25",
     "main": "backend/server.js"
 }
